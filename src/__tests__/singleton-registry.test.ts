@@ -12,6 +12,33 @@ class NoArgsService {
   public id = Math.random();
 }
 
+class DatabaseService {
+  constructor(public config: ConfigService) {}
+}
+
+class ApiService {
+  constructor(public config: ConfigService, public database: DatabaseService, public timeout: number) {}
+}
+
+class LoggerService {
+  public logs: string[] = [];
+  log(message: string) {
+    this.logs.push(message);
+  }
+}
+
+class ServiceWithLogger {
+  constructor(public logger: LoggerService, public name: string) {}
+}
+
+class CircularA {
+  constructor(public b: CircularB) {}
+}
+
+class CircularB {
+  constructor(public a: CircularA) {}
+}
+
 describe('SingletonRegistry', () => {
   beforeEach(() => {
     SingletonRegistry.clear();
@@ -124,6 +151,163 @@ describe('SingletonRegistry', () => {
 
     it('should return false for unregistered singletons', () => {
       expect(SingletonRegistry.isRegistered(TestService)).toBe(false);
+    });
+  });
+});
+
+describe('Dependency Injection', () => {
+  beforeEach(() => {
+    SingletonRegistry.clear();
+  });
+
+  describe('Basic dependency injection', () => {
+    it('should inject singleton dependencies into constructor', () => {
+      SingletonRegistry.register(ConfigService, 3000, 'localhost');
+      SingletonRegistry.register(DatabaseService, ConfigService);
+
+      const database = SingletonRegistry.get(DatabaseService);
+      const config = SingletonRegistry.get(ConfigService);
+
+      expect(database).toBeInstanceOf(DatabaseService);
+      expect(database.config).toBe(config);
+      expect(database.config.port).toBe(3000);
+      expect(database.config.host).toBe('localhost');
+    });
+
+    it('should handle mixed dependencies and regular args', () => {
+      SingletonRegistry.register(LoggerService);
+      SingletonRegistry.register(ServiceWithLogger, LoggerService, 'test-service');
+
+      const service = SingletonRegistry.get(ServiceWithLogger);
+      const logger = SingletonRegistry.get(LoggerService);
+
+      expect(service).toBeInstanceOf(ServiceWithLogger);
+      expect(service.logger).toBe(logger);
+      expect(service.name).toBe('test-service');
+    });
+  });
+
+  describe('Multiple dependencies', () => {
+    it('should inject multiple singleton dependencies', () => {
+      SingletonRegistry.register(ConfigService, 8080, 'api.example.com');
+      SingletonRegistry.register(DatabaseService, ConfigService);
+      SingletonRegistry.register(ApiService, ConfigService, DatabaseService, 5000);
+
+      const api = SingletonRegistry.get(ApiService);
+      const config = SingletonRegistry.get(ConfigService);
+      const database = SingletonRegistry.get(DatabaseService);
+
+      expect(api).toBeInstanceOf(ApiService);
+      expect(api.config).toBe(config);
+      expect(api.database).toBe(database);
+      expect(api.timeout).toBe(5000);
+    });
+  });
+
+  describe('Nested dependencies', () => {
+    it('should resolve nested dependency chains', () => {
+      SingletonRegistry.register(ConfigService, 9000, 'nested.example.com');
+      SingletonRegistry.register(DatabaseService, ConfigService);
+      SingletonRegistry.register(ApiService, ConfigService, DatabaseService, 2000);
+
+      const api = SingletonRegistry.get(ApiService);
+
+      expect(api.config.port).toBe(9000);
+      expect(api.config.host).toBe('nested.example.com');
+      expect(api.database.config).toBe(api.config);
+      expect(api.timeout).toBe(2000);
+    });
+
+    it('should initialize dependencies in correct order', () => {
+      const initOrder: string[] = [];
+
+      class TrackingConfig {
+        constructor(public value: string) {
+          initOrder.push('Config');
+        }
+      }
+
+      class TrackingDatabase {
+        constructor(public config: TrackingConfig) {
+          initOrder.push('Database');
+        }
+      }
+
+      class TrackingApi {
+        constructor(public database: TrackingDatabase) {
+          initOrder.push('Api');
+        }
+      }
+
+      SingletonRegistry.register(TrackingConfig, 'test-value');
+      SingletonRegistry.register(TrackingDatabase, TrackingConfig);
+      SingletonRegistry.register(TrackingApi, TrackingDatabase);
+
+      SingletonRegistry.get(TrackingApi);
+
+      expect(initOrder).toEqual(['Config', 'Database', 'Api']);
+    });
+  });
+
+  describe('Circular dependency detection', () => {
+    it('should detect and throw error for circular dependencies', () => {
+      SingletonRegistry.register(CircularA, CircularB);
+      SingletonRegistry.register(CircularB, CircularA);
+
+      expect(() => {
+        SingletonRegistry.get(CircularA);
+      }).toThrow('Circular dependency detected: CircularA -> CircularB -> CircularA');
+    });
+
+    it('should detect self-referencing circular dependencies', () => {
+      class SelfReferencing {
+        constructor(public self: SelfReferencing) {}
+      }
+
+      SingletonRegistry.register(SelfReferencing, SelfReferencing);
+
+      expect(() => {
+        SingletonRegistry.get(SelfReferencing);
+      }).toThrow('Circular dependency detected: SelfReferencing -> SelfReferencing');
+    });
+  });
+
+  describe('Error handling', () => {
+    it('should throw error for unregistered dependencies', () => {
+      class UnregisteredDep {
+        constructor() {}
+      }
+
+      class ServiceWithUnregisteredDep {
+        constructor(public dep: UnregisteredDep) {}
+      }
+
+      SingletonRegistry.register(ServiceWithUnregisteredDep, UnregisteredDep);
+
+      expect(() => {
+        SingletonRegistry.get(ServiceWithUnregisteredDep);
+      }).toThrow('Dependency UnregisteredDep is not registered for singleton ServiceWithUnregisteredDep');
+    });
+
+    it('should provide helpful error messages', () => {
+      expect(() => {
+        SingletonRegistry.get(TestService);
+      }).toThrow('Singleton TestService is not registered');
+    });
+  });
+
+  describe('Singleton behavior with dependencies', () => {
+    it('should maintain singleton behavior for dependencies', () => {
+      SingletonRegistry.register(ConfigService, 4000, 'singleton.test');
+      SingletonRegistry.register(DatabaseService, ConfigService);
+
+      const database1 = SingletonRegistry.get(DatabaseService);
+      const database2 = SingletonRegistry.get(DatabaseService);
+      const config1 = SingletonRegistry.get(ConfigService);
+      const config2 = database1.config;
+
+      expect(database1).toBe(database2);
+      expect(config1).toBe(config2);
     });
   });
 });
