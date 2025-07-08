@@ -1,14 +1,17 @@
 # TrueStatic
 
-A TypeScript framework for managing singleton instances with type safety and zero boilerplate.
+A TypeScript framework for managing singleton instances with type safety and zero boilerplate. Inspired by Godot's Autoload system, TrueStatic provides global access to singletons without the traditional `getInstance()` boilerplate.
 
 ## Features
 
+- **Global Access**: Access singletons from anywhere without imports (like Godot's Autoload)
 - **Zero Boilerplate**: No more `getInstance()` calls or static methods
 - **Type Safe**: Full TypeScript support with autocomplete and type checking
+- **Dependency Injection**: Automatic resolution of singleton dependencies
 - **Lazy Initialization**: Singletons are only created when first accessed
 - **Constructor Arguments**: Support for singletons that need configuration
 - **Testing Friendly**: Easy to mock and reset between tests
+- **Circular Dependency Detection**: Helpful error messages for dependency cycles
 
 ## Installation
 
@@ -21,6 +24,37 @@ yarn add true-static
 ```
 
 ## Quick Start
+
+### Global Access Pattern (Recommended)
+
+```typescript
+import { initializeGlobalAccess, registerGlobalSingleton } from 'true-static';
+
+// Initialize global access (call once in your app)
+initializeGlobalAccess();
+
+// Define your service classes
+class ConfigService {
+  constructor(public apiUrl: string, public timeout: number) {}
+}
+
+class DatabaseService {
+  constructor(public connectionString: string) {}
+}
+
+// Register singletons globally
+registerGlobalSingleton('ConfigService', ConfigService, 'https://api.example.com', 5000);
+registerGlobalSingleton('DatabaseService', DatabaseService, 'postgresql://localhost:5432/mydb');
+
+// Access singletons anywhere in your app without imports!
+const config = Global.ConfigService;
+const db = Global.DatabaseService;
+
+console.log(config.apiUrl); // 'https://api.example.com'
+console.log(db.connectionString); // 'postgresql://localhost:5432/mydb'
+```
+
+### Traditional Registry Pattern
 
 ```typescript
 import { Singletons } from 'true-static';
@@ -48,7 +82,54 @@ console.log(db.connectionString); // 'postgresql://localhost:5432/mydb'
 
 ## Usage Examples
 
-### Simple Service (No Constructor Arguments)
+### Global Access with Type Safety
+
+To get full type safety with global access, extend the `GlobalSingletons` interface:
+
+```typescript
+// types.ts - Define your global singletons interface
+declare module 'true-static' {
+  interface GlobalSingletons {
+    ConfigService: ConfigService;
+    DatabaseService: DatabaseService;
+    LoggerService: LoggerService;
+  }
+}
+
+// Now you get full autocomplete and type checking!
+const config = Global.ConfigService; // ✅ Fully typed
+const db = Global.DatabaseService;   // ✅ Fully typed
+const logger = Global.LoggerService; // ✅ Fully typed
+```
+
+### Dependency Injection
+
+```typescript
+class ConfigService {
+  constructor(public apiUrl: string, public timeout: number) {}
+}
+
+class ApiService {
+  constructor(
+    private config: ConfigService,
+    private retryCount: number = 3
+  ) {}
+
+  async fetchData(endpoint: string) {
+    // Use this.config.apiUrl and this.config.timeout
+  }
+}
+
+// Register with dependency injection
+registerGlobalSingleton('ConfigService', ConfigService, 'https://api.example.com', 5000);
+registerGlobalSingleton('ApiService', ApiService, ConfigService, 5);
+
+// Dependencies are automatically resolved
+const api = Global.ApiService;
+console.log(api.config.apiUrl); // 'https://api.example.com'
+```
+
+### Service with No Constructor Arguments
 
 ```typescript
 class LoggerService {
@@ -58,49 +139,37 @@ class LoggerService {
 }
 
 // Register without arguments
-Singletons.register(LoggerService);
+registerGlobalSingleton('LoggerService', LoggerService);
 
 // Use anywhere
-const logger = Singletons.get(LoggerService);
+const logger = Global.LoggerService;
 logger.log('Hello world!');
-```
-
-### Service with Configuration
-
-```typescript
-class ApiService {
-  constructor(
-    private baseUrl: string,
-    private apiKey: string,
-    private retryCount: number = 3
-  ) {}
-
-  async fetchData(endpoint: string) {
-    // Implementation here
-  }
-}
-
-// Register with configuration
-Singletons.register(ApiService, 'https://api.example.com', 'your-api-key', 5);
-
-// Use the configured singleton
-const api = Singletons.get(ApiService);
-api.fetchData('/users');
 ```
 
 ### Testing
 
 ```typescript
-import { Singletons } from 'true-static';
+import { Singletons, initializeGlobalAccess, registerGlobalSingleton } from 'true-static';
 
 describe('MyService', () => {
   beforeEach(() => {
     // Clear all singletons before each test
     Singletons.clear();
+    
+    // Reinitialize global access for each test
+    initializeGlobalAccess();
   });
 
   it('should work with fresh singleton instances', () => {
     // Register test-specific configuration
+    registerGlobalSingleton('ConfigService', ConfigService, 'http://test-api.com', 1000);
+    
+    const config = Global.ConfigService;
+    expect(config.apiUrl).toBe('http://test-api.com');
+  });
+
+  it('should work with traditional registry pattern', () => {
+    // You can still use the traditional pattern in tests
     Singletons.register(ConfigService, 'http://test-api.com', 1000);
     
     const config = Singletons.get(ConfigService);
@@ -111,7 +180,42 @@ describe('MyService', () => {
 
 ## API Reference
 
-### `Singletons.register<T>(constructor: Constructor<T>, ...args: any[]): void`
+### Global Access API
+
+#### `initializeGlobalAccess(): void`
+
+Initialize the global access system. Call this once in your application entry point.
+
+#### `registerGlobalSingleton<T>(name: string, constructor: Constructor<T>, ...args: any[]): void`
+
+Register a singleton class with a global name for easy access.
+
+**Parameters:**
+- `name`: The global name for the singleton (used in `Global.{name}`)
+- `constructor`: The class to register as a singleton
+- `...args`: Arguments to pass to the constructor (including other singleton classes for dependency injection)
+
+**Throws:**
+- `Error` if the class is already registered
+
+#### `Global.{name}`
+
+Access any registered singleton globally. Returns the singleton instance, creating it on first access.
+
+**Type Safety:**
+To get full TypeScript support, extend the `GlobalSingletons` interface:
+
+```typescript
+declare module 'true-static' {
+  interface GlobalSingletons {
+    YourService: YourService;
+  }
+}
+```
+
+### Traditional Registry API
+
+#### `Singletons.register<T>(constructor: Constructor<T>, ...args: any[]): void`
 
 Register a singleton class with optional constructor arguments.
 
@@ -122,7 +226,7 @@ Register a singleton class with optional constructor arguments.
 **Throws:**
 - `Error` if the class is already registered
 
-### `Singletons.get<T>(constructor: Constructor<T>): T`
+#### `Singletons.get<T>(constructor: Constructor<T>): T`
 
 Get the singleton instance of a class. Creates the instance on first access.
 
@@ -135,11 +239,11 @@ Get the singleton instance of a class. Creates the instance on first access.
 **Throws:**
 - `Error` if the class is not registered
 
-### `Singletons.clear(): void`
+#### `Singletons.clear(): void`
 
 Clear all registered singletons. Useful for testing.
 
-### `Singletons.isRegistered<T>(constructor: Constructor<T>): boolean`
+#### `Singletons.isRegistered<T>(constructor: Constructor<T>): boolean`
 
 Check if a class is registered as a singleton.
 
@@ -168,21 +272,45 @@ class ConfigService {
   }
 }
 
-// Usage requires remembering getInstance()
+// Usage requires remembering getInstance() everywhere
 const config = ConfigService.getInstance();
 ```
 
-TrueStatic eliminates this boilerplate:
+TrueStatic eliminates this boilerplate with two approaches:
 
+### Global Access (Godot-style)
 ```typescript
-// TrueStatic approach - clean and simple
+// Clean class definition
 class ConfigService {
   constructor(private apiUrl: string) {}
 }
 
+// One-time registration
+initializeGlobalAccess();
+registerGlobalSingleton('ConfigService', ConfigService, 'https://api.example.com');
+
+// Access anywhere without imports!
+const config = Global.ConfigService;
+```
+
+### Traditional Registry
+```typescript
+// Clean class definition  
+class ConfigService {
+  constructor(private apiUrl: string) {}
+}
+
+// Simple registration
 Singletons.register(ConfigService, 'https://api.example.com');
 const config = Singletons.get(ConfigService);
 ```
+
+Both approaches provide:
+- ✅ **Zero boilerplate** in your classes
+- ✅ **Full type safety** with TypeScript
+- ✅ **Automatic dependency injection**
+- ✅ **Easy testing** with reset functionality
+- ✅ **Lazy initialization** for better performance
 
 ## License
 
