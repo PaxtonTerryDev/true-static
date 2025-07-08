@@ -94,3 +94,67 @@ export class SingletonRegistry {
 }
 
 export const Singletons = SingletonRegistry;
+
+declare global {
+  interface GlobalSingletons {}
+  
+  var Global: GlobalSingletons;
+}
+
+class GlobalSingletonProxy {
+  private static instance: GlobalSingletonProxy;
+  private proxy: any;
+
+  private constructor() {
+    this.proxy = new Proxy(this, {
+      get: (target, prop: string | symbol) => {
+        if (typeof prop === 'string') {
+          const constructorMap = (globalThis as any).__singletonConstructorMap;
+          if (constructorMap && constructorMap.has(prop)) {
+            const constructor = constructorMap.get(prop);
+            return SingletonRegistry.get(constructor);
+          }
+        }
+        return undefined;
+      }
+    });
+  }
+
+  static getInstance(): GlobalSingletonProxy {
+    if (!GlobalSingletonProxy.instance) {
+      GlobalSingletonProxy.instance = new GlobalSingletonProxy();
+    }
+    return GlobalSingletonProxy.instance;
+  }
+
+  getProxy() {
+    return this.proxy;
+  }
+}
+
+export function initializeGlobalAccess() {
+  if (typeof globalThis !== 'undefined' && !globalThis.Global) {
+    if (!(globalThis as any).__singletonConstructorMap) {
+      (globalThis as any).__singletonConstructorMap = new Map<string, Constructor<any>>();
+    }
+    
+    const proxyInstance = GlobalSingletonProxy.getInstance();
+    (globalThis as any).Global = proxyInstance.getProxy();
+  }
+}
+
+export function registerGlobalSingleton<T>(
+  name: string,
+  constructor: Constructor<T>,
+  ...args: any[]
+): void {
+  SingletonRegistry.register(constructor, ...args);
+  
+  if (typeof globalThis !== 'undefined') {
+    if (!(globalThis as any).__singletonConstructorMap) {
+      (globalThis as any).__singletonConstructorMap = new Map<string, Constructor<any>>();
+    }
+    
+    (globalThis as any).__singletonConstructorMap.set(name, constructor);
+  }
+}
