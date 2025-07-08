@@ -1,0 +1,1 @@
+export { SingletonRegistry, Singletons } from './singleton-registry';
