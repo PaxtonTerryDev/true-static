@@ -1,18 +1,42 @@
 {
   "name": "true-static",
   "version": "1.0.0",
-  "description": "",
+  "description": "A TypeScript framework for managing singleton instances with type safety and zero boilerplate. Provides Godot Autoload-style global access to singletons.",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "tsx --watch src/index.ts",
     "build": "tsc",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "prepublishOnly": "npm run build && npm test"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "singleton",
+    "typescript",
+    "dependency-injection",
+    "type-safe",
+    "global-access",
+    "service-locator",
+    "framework",
+    "zero-boilerplate"
+  ],
+  "author": "Paxton Terry",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PaxtonTerryDev/true-static.git"
+  },
+  "homepage": "https://github.com/PaxtonTerryDev/true-static#readme",
+  "bugs": {
+    "url": "https://github.com/PaxtonTerryDev/true-static/issues"
+  },
   "packageManager": "pnpm@10.9.0",
   "devDependencies": {
     "@types/jest": "^30.0.0",
