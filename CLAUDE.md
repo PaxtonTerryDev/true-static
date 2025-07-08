@@ -1,8 +1,10 @@
-# Singleton Manager - TypeScript Portfolio Project
+# Singleton Manager - TypeScript NPM Package
 
 ## Project Overview
 
 A TypeScript framework for managing singleton instances with a focus on developer experience and type safety. The goal is to eliminate the boilerplate and awkwardness of traditional singleton patterns while providing Godot Autoload-style convenience for accessing singletons throughout an application.
+
+**This project is designed to be published as an NPM package** for use in TypeScript/JavaScript projects.
 
 ## Problem Statement
 
