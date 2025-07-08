@@ -1,17 +1,67 @@
 # TrueStatic
 
-A TypeScript framework for managing singleton instances with type safety and zero boilerplate. Inspired by Godot's Autoload system, TrueStatic provides global access to singletons without the traditional `getInstance()` boilerplate.
+A TypeScript framework for managing singleton instances with type safety and zero boilerplate. Inspired by Godot's Autoload system, TrueStatic eliminates the traditional `getInstance()` pattern and provides clean, type-safe global access to your services.
+
+## Why TrueStatic?
+
+Traditional singleton patterns in TypeScript are verbose and error-prone:
+
+```typescript
+// Traditional approach - verbose and error-prone
+class ConfigService {
+  private static instance: ConfigService;
+  
+  private constructor(private apiUrl: string) {}
+  
+  static getInstance(): ConfigService {
+    if (!ConfigService.instance) {
+      ConfigService.instance = new ConfigService('default-url');
+    }
+    return ConfigService.instance;
+  }
+}
+
+// Usage requires remembering getInstance() everywhere
+const config = ConfigService.getInstance();
+```
+
+TrueStatic eliminates this boilerplate entirely:
+
+```typescript
+// Clean class definition
+class ConfigService {
+  constructor(private apiUrl: string) {}
+}
+
+// One-time registration
+initializeGlobalAccess();
+registerGlobalSingleton('ConfigService', ConfigService, 'https://api.example.com');
+
+// Access anywhere without imports!
+const config = Global.ConfigService;
+```
 
 ## Features
 
-- **Global Access**: Access singletons from anywhere without imports (like Godot's Autoload)
 - **Zero Boilerplate**: No more `getInstance()` calls or static methods
+- **Global Access**: Access singletons from anywhere without imports (like Godot's Autoload)
 - **Type Safe**: Full TypeScript support with autocomplete and type checking
 - **Dependency Injection**: Automatic resolution of singleton dependencies
 - **Lazy Initialization**: Singletons are only created when first accessed
 - **Constructor Arguments**: Support for singletons that need configuration
 - **Testing Friendly**: Easy to mock and reset between tests
 - **Circular Dependency Detection**: Helpful error messages for dependency cycles
+
+## Important Limitations
+
+**TrueStatic is not a traditional singleton enforcer.** It acts as a convenient access point and registry for managing single instances, but does not prevent additional instantiations of registered classes.
+
+- **Direct instantiation is still possible**: You can still create new instances with `new YourService()` even after registering it as a singleton
+- **Access point pattern**: TrueStatic provides a centralized way to access shared instances, similar to a service locator
+- **Developer responsibility**: It's up to you to use the singleton registry consistently rather than creating new instances directly
+- **Testing flexibility**: This design actually makes testing easier since you can create isolated instances when needed
+
+If you need strict singleton enforcement that prevents all direct instantiation, consider using traditional private constructor patterns alongside TrueStatic.
 
 ## Installation
 
@@ -25,15 +75,17 @@ yarn add true-static
 
 ## Quick Start
 
+TrueStatic offers two patterns for managing singletons:
+
 ### Global Access Pattern (Recommended)
 
 ```typescript
 import { initializeGlobalAccess, registerGlobalSingleton } from 'true-static';
 
-// Initialize global access (call once in your app)
+// 1. Initialize global access (call once in your app)
 initializeGlobalAccess();
 
-// Define your service classes
+// 2. Define your service classes
 class ConfigService {
   constructor(public apiUrl: string, public timeout: number) {}
 }
@@ -42,11 +94,11 @@ class DatabaseService {
   constructor(public connectionString: string) {}
 }
 
-// Register singletons globally
+// 3. Register singletons globally
 registerGlobalSingleton('ConfigService', ConfigService, 'https://api.example.com', 5000);
 registerGlobalSingleton('DatabaseService', DatabaseService, 'postgresql://localhost:5432/mydb');
 
-// Access singletons anywhere in your app without imports!
+// 4. Access singletons anywhere in your app without imports!
 const config = Global.ConfigService;
 const db = Global.DatabaseService;
 
@@ -82,9 +134,9 @@ console.log(db.connectionString); // 'postgresql://localhost:5432/mydb'
 
 ## Usage Examples
 
-### Global Access with Type Safety
+### TypeScript Integration
 
-To get full type safety with global access, extend the `GlobalSingletons` interface:
+For full type safety with global access, extend the `GlobalSingletons` interface:
 
 ```typescript
 // types.ts - Define your global singletons interface
@@ -103,6 +155,8 @@ const logger = Global.LoggerService; // ✅ Fully typed
 ```
 
 ### Dependency Injection
+
+TrueStatic automatically resolves dependencies between singletons:
 
 ```typescript
 class ConfigService {
@@ -129,7 +183,7 @@ const api = Global.ApiService;
 console.log(api.config.apiUrl); // 'https://api.example.com'
 ```
 
-### Service with No Constructor Arguments
+### Services Without Constructor Arguments
 
 ```typescript
 class LoggerService {
@@ -147,6 +201,8 @@ logger.log('Hello world!');
 ```
 
 ### Testing
+
+TrueStatic provides easy testing utilities for isolating singleton instances:
 
 ```typescript
 import { Singletons, initializeGlobalAccess, registerGlobalSingleton } from 'true-static';
@@ -253,65 +309,10 @@ Check if a class is registered as a singleton.
 **Returns:**
 - `true` if the class is registered, `false` otherwise
 
-## Why TrueStatic?
+## Contributing
 
-Traditional singleton patterns in TypeScript are verbose and awkward:
-
-```typescript
-// Traditional approach - verbose and error-prone
-class ConfigService {
-  private static instance: ConfigService;
-  
-  private constructor(private apiUrl: string) {}
-  
-  static getInstance(): ConfigService {
-    if (!ConfigService.instance) {
-      ConfigService.instance = new ConfigService('default-url');
-    }
-    return ConfigService.instance;
-  }
-}
-
-// Usage requires remembering getInstance() everywhere
-const config = ConfigService.getInstance();
-```
-
-TrueStatic eliminates this boilerplate with two approaches:
-
-### Global Access (Godot-style)
-```typescript
-// Clean class definition
-class ConfigService {
-  constructor(private apiUrl: string) {}
-}
-
-// One-time registration
-initializeGlobalAccess();
-registerGlobalSingleton('ConfigService', ConfigService, 'https://api.example.com');
-
-// Access anywhere without imports!
-const config = Global.ConfigService;
-```
-
-### Traditional Registry
-```typescript
-// Clean class definition  
-class ConfigService {
-  constructor(private apiUrl: string) {}
-}
-
-// Simple registration
-Singletons.register(ConfigService, 'https://api.example.com');
-const config = Singletons.get(ConfigService);
-```
-
-Both approaches provide:
-- ✅ **Zero boilerplate** in your classes
-- ✅ **Full type safety** with TypeScript
-- ✅ **Automatic dependency injection**
-- ✅ **Easy testing** with reset functionality
-- ✅ **Lazy initialization** for better performance
+We welcome contributions! Please feel free to submit issues and enhancement requests.
 
 ## License
 
-ISC
+This project is licensed under the ISC License.
